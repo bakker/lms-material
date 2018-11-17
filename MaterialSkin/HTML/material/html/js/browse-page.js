@@ -6,6 +6,7 @@
  */
 
 var PLAY_ACTION             = {cmd:"play",       icon:"play_circle_outline"};
+var PLAY_ALBUM_ACTION       = {cmd:"play_album", icon:"album"};
 var ADD_ACTION              = {cmd:"add",        icon:"add_circle_outline"};
 var INSERT_ACTION           = {cmd:"add-hold",   icon:"format_indent_increase"};
 var MORE_ACTION             = {cmd:"more",       icon:"more_horiz"};
@@ -137,7 +138,7 @@ var lmsBrowse = Vue.component("lms-browse", {
   <template v-if="isTop" v-for="(item, index) in pinned">
    <v-divider v-if="index>0 && pinned.length>index"></v-divider>
 
-   <v-list-tile avatar @click="click(item.item, $event)" :key="item.id">
+   <v-list-tile avatar @click="click(item.item, index, $event)" :key="item.id">
     <v-list-tile-avatar v-if="item.item.image" :tile="true">
      <img v-lazy="item.item.image">
     </v-list-tile-avatar>
@@ -149,12 +150,12 @@ var lmsBrowse = Vue.component("lms-browse", {
      <v-list-tile-title v-html="item.title"></v-list-tile-title>
     </v-list-tile-content>
 
-    <v-list-tile-action v-if="item.item.menuActions && item.item.menuActions.length>1" @click.stop="itemMenu(item.item, $event)">
+    <v-list-tile-action v-if="item.item.menuActions && item.item.menuActions.length>1" @click.stop="itemMenu(item.item, index, $event)">
      <v-btn icon>
       <v-icon>more_vert</v-icon>
      </v-btn>
     </v-list-tile-action>
-    <v-list-tile-action v-else-if="item.item.menuActions && item.item.menuActions.length===1" @click.stop="itemAction(item.item.menuActions[0].cmd, item.item)">
+    <v-list-tile-action v-else-if="item.item.menuActions && item.item.menuActions.length===1" @click.stop="itemAction(item.item.menuActions[0].cmd, item.item, index)">
      <v-btn icon>
       <v-icon>{{item.item.menuActions[0].icon}}</v-icon>
      </v-btn>
@@ -169,14 +170,14 @@ var lmsBrowse = Vue.component("lms-browse", {
    <v-subheader v-if="item.header">{{ item.header }}</v-subheader>
 
    <v-divider v-else-if="!item.disabled && index>0 && items.length>index && !items[index-1].header" :inset="item.inset"></v-divider>
-   <v-list-tile v-if="item.type=='text' && item.style && item.style.startsWith('item') && item.style!='itemNoAction'" avatar @click="click(item, $event, true)" v-bind:class="{'error-text': item.id==='error'}">
+   <v-list-tile v-if="item.type=='text' && item.style && item.style.startsWith('item') && item.style!='itemNoAction'" avatar @click="click(item, index, $event, true)" v-bind:class="{'error-text': item.id==='error'}">
     <v-list-tile-content>
      <v-list-tile-title v-html="item.title"></v-list-tile-title>
      <v-list-tile-sub-title v-html="item.subtitle"></v-list-tile-sub-title>
     </v-list-tile-content>
    </v-list-tile>
    <p v-else-if="item.type=='text'" class="browse-text" v-html="item.title"></p>
-   <v-list-tile v-else-if="!item.disabled && !item.header" avatar @click="click(item, $event, false)" :key="item.id">
+   <v-list-tile v-else-if="!item.disabled && !item.header" avatar @click="click(item, index, $event, false)" :key="item.id">
     <v-list-tile-avatar v-if="item.image" :tile="true">
      <img v-lazy="item.image"></img>
     </v-list-tile-avatar>
@@ -193,12 +194,12 @@ var lmsBrowse = Vue.component("lms-browse", {
      <v-list-tile-sub-title v-html="item.subtitle"></v-list-tile-sub-title>
     </v-list-tile-content>
 
-    <v-list-tile-action v-if="item.menuActions && item.menuActions.length>1" @click.stop="itemMenu(item, $event)">
+    <v-list-tile-action v-if="item.menuActions && item.menuActions.length>1" @click.stop="itemMenu(item, index, $event)">
      <v-btn icon>
       <v-icon>more_vert</v-icon>
      </v-btn>
     </v-list-tile-action>
-    <v-list-tile-action v-else-if="item.menuActions && item.menuActions.length===1" @click.stop="itemAction(item.menuActions[0].cmd, item)">
+    <v-list-tile-action v-else-if="item.menuActions && item.menuActions.length===1" @click.stop="itemAction(item.menuActions[0].cmd, item, index)">
      <v-btn icon>
       <v-icon>{{item.menuActions[0].icon}}</v-icon>
      </v-btn>
@@ -213,7 +214,7 @@ var lmsBrowse = Vue.component("lms-browse", {
   <v-list v-if="menu.item">
    <template v-for="(action, index) in menu.item.menuActions">
     <v-divider v-if="action.divider"></v-divider>
-    <v-list-tile v-else @click="itemAction(action.cmd, menu.item)">
+    <v-list-tile v-else @click="itemAction(action.cmd, menu.item, menu.index)">
      <v-list-tile-title><v-icon>{{action.icon}}</v-icon>&nbsp;&nbsp;{{action.title}}</v-list-tile-title>
     </v-list-tile>
    </template>
@@ -295,6 +296,7 @@ var lmsBrowse = Vue.component("lms-browse", {
     methods: {
         initItems() {
             PLAY_ACTION.title=i18n("Play now");
+            PLAY_ALBUM_ACTION.title=i18n("Play album starting at track");
             ADD_ACTION.title=i18n("Append to queue");
             ADD_RANDOM_ALBUM_ACTION.title=i18n("Append random album to queue");
             INSERT_ACTION.title=i18n("Play next");
@@ -480,7 +482,7 @@ var lmsBrowse = Vue.component("lms-browse", {
                 this.showError(err);
             });
         },
-        click(item, event, allowItemPlay) {
+        click(item, index, event, allowItemPlay) {
             if ("search"==item.type) {
                 if (/Android|webOS|iPhone|iPad|BlackBerry|Windows Phone|Opera Mini|IEMobile|Mobile/i.test(navigator.userAgent)) {
                     event.target.scrollIntoView();
@@ -502,7 +504,7 @@ var lmsBrowse = Vue.component("lms-browse", {
             if ("audio"==item.type  || "track"==item.type /*|| "itemplay"==item.style || "item_play"==item.style*/ ||
                 (item.goAction && (item.goAction == "playControl" || item.goAction == "play"))) {
                 if (this.$store.state.showMenuAudio) {
-                    this.itemMenu(item, event);
+                    this.itemMenu(item, index, event);
                 }
                 return;
             }
@@ -546,7 +548,7 @@ var lmsBrowse = Vue.component("lms-browse", {
                 if (command.command.length>2 && command.command[1]=="playlist") {
                     // TODO: Is not a browse command
                     if (this.$store.state.showMenuAudio) {
-                        this.itemMenu(item, event);
+                        this.itemMenu(item, index, event);
                     }
                     return;
                 }
@@ -591,7 +593,7 @@ var lmsBrowse = Vue.component("lms-browse", {
                 }
             }
         },
-        itemAction(act, item) {
+        itemAction(act, item, index) {
             if (act===RENAME_PL_ACTION.cmd) {
                 this.dialog = { show:true, title:i18n("Rename playlist"), hint:item.value, value:item.title, ok: i18n("Rename"), cancel:undefined,
                                 command:["playlists", "rename", item.id, "newname:"+TERM_PLACEHOLDER]};
@@ -721,7 +723,27 @@ var lmsBrowse = Vue.component("lms-browse", {
                     } else if (item.app && item.id) {
                         command.command = [item.app, "playlist", act, item.id];
                     } else if (item.id) {
-                        command.command = ["playlistcontrol", "cmd:"+(act=="play" ? "load" : act), item.id];
+                        var itemId = item.id;
+                        var loadingItem = item;
+                        command.command = ["playlistcontrol", "cmd:"+(act==PLAY_ACTION.cmd || act==PLAY_ALBUM_ACTION.cmd ? "load" : act)];
+
+                        // NOTE(a): Play whole album, starting at selected track. First load album, then play track at index
+                        if (undefined!==index && PLAY_ALBUM_ACTION.cmd == act && item.id.startsWith("track_id:") && this.current && 
+                            this.current.id && this.current.id.startsWith("album_id:") ) {
+                            loadingItem = this.current;
+                            command.command.push("play_index:"+index);
+                        }
+
+                        if (loadingItem.id.startsWith("album_id:")  || loadingItem.id.startsWith("artist_id:")) {
+                            loadingItem.params.forEach(p => {
+                                if ( (!this.options.noRoleFilter && (p.startsWith("role_id:") || p.startsWith("artist_id:"))) ||
+                                     (!this.options.noGenreFilter && p.startsWith("genre_id:"))) {
+                                    command.command.push(p);
+                                }
+                            });
+                        }
+
+                        command.command.push(loadingItem.id);
                     }
                 }
 
@@ -743,6 +765,8 @@ var lmsBrowse = Vue.component("lms-browse", {
                     if (!this.desktop) {
                         if (act===PLAY_ACTION.cmd) {
                             this.$router.push('/nowplaying');
+                        } else if (act==PLAY_ALBUM_ACTION.cmd || act==PLAY_ALBUM_ACTION.cmd) {
+                            this.$router.push('/nowplaying');
                         } else if (act===ADD_ACTION.cmd) {
                             this.showMessage(i18n("Appended '%1' to the play queue", item.title));
                         } else if (act==="insert") {
@@ -754,7 +778,7 @@ var lmsBrowse = Vue.component("lms-browse", {
                 });
             }
         },
-        itemMenu(item, event) {
+        itemMenu(item, index, event) {
             if (!item.menuActions) {
                 return;
             }
@@ -765,7 +789,7 @@ var lmsBrowse = Vue.component("lms-browse", {
                 // Only have 'More' - dont display menu, just activate action...
                 this.itemAction(MORE_LIB_ACTION.cmd, item);
             } else {
-                this.menu={show:true, item:item, x:event.clientX, y:event.clientY};
+                this.menu={show:true, item:item, x:event.clientX, y:event.clientY, index:index};
             }
         },
         showHistory(event) {
